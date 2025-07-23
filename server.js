@@ -1,76 +1,45 @@
-// backend/server.js
 const express = require('express');
-//const fetch = require('node-fetch');
-const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
-
+const cors = require('cors');
 const { Pool } = require('pg');
-const path = require('path');
+const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
+
 const app = express();
-const PORT = process.env.PORT || 3000;
+const port = 3000;
 
-// Serve static frontend files
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(cors());
+app.use(express.json());
 
-// PostgreSQL connection
 const pool = new Pool({
-  connectionString: 'postgresql://neondb_owner:npg_HgyflU0YOxM3@ep-broad-sea-a79991m5-pooler.ap-southeast-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require',
+  connectionString: 'your_neondb_url'
 });
 
-// Create table if not exists
-const initDB = async () => {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS visitors (
-      id SERIAL PRIMARY KEY,
-      ip VARCHAR(45),
-      country VARCHAR(50),
-      region VARCHAR(50),
-      city VARCHAR(50),
-      timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
-};
-initDB();
-
-// Get IP and location
-app.get('/api/track', async (req, res) => {
-  const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress;
-
-  if (!ip || ip === '::1' || ip.startsWith('127.')) {
-    return res.json({ ip, note: 'Localhost or internal IP detected' });
-  }
+// 👉 Save location (no reverse geocode here)
+app.post('/api/save-location', async (req, res) => {
+  const { ip, lat, lon, location } = req.body;
 
   try {
-    const geo = await fetch(`http://ip-api.com/json/${ip}`).then(r => r.json());
-
     await pool.query(
-      'INSERT INTO visitors (ip, country, region, city) VALUES ($1, $2, $3, $4)',
-      [ip, geo.country, geo.regionName, geo.city]
+      'INSERT INTO visitors (ip, lat, lon, city) VALUES ($1, $2, $3, $4)',
+      [ip, lat, lon, location]
     );
-
-    res.json({
-      ip,
-      country: geo.country,
-      region: geo.regionName,
-      city: geo.city,
-    });
+    res.status(200).json({ message: "Location saved" });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Error fetching geolocation.' });
+    res.status(500).json({ error: "Failed to save" });
   }
 });
 
-// Show history
+// 👉 Get history
 app.get('/api/history', async (req, res) => {
   try {
-    const { rows } = await pool.query(
-      'SELECT ip, country, region, city, timestamp FROM visitors ORDER BY timestamp DESC LIMIT 50'
-    );
-    res.json(rows);
+    const result = await pool.query('SELECT * FROM visitors ORDER BY id DESC');
+    res.json(result.rows);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Error fetching history.' });
+    res.status(500).json({ error: "Failed to fetch history" });
   }
 });
 
-// Start server
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(port, () => {
+  console.log(`Server running on port ${port}`);
+});
