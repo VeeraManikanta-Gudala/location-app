@@ -20,7 +20,7 @@ jobs:
 
     - name: Deploy via SSH
       run: |
-        ssh -o StrictHostKeyChecking=no ubuntu@YOUR_EC2_PUBLIC_IP << 'EOF'
+        ssh -o StrictHostKeyChecking=no ubuntu@13.204.77.128 << 'EOF'
           cd ~/location-app || git clone https://github.com/VeeraManikanta-Gudala/location-app.git location-app && cd location-app
           git pull
           docker build -t location-tracker .
