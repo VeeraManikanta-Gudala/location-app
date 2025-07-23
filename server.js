@@ -33,11 +33,13 @@ initDB();
 
 // Get IP and location
 app.get('/api/track', async (req, res) => {
-  try {
-    const ip = await fetch('https://api.ipify.org?format=json')
-      .then(res => res.json())
-      .then(data => data.ip);
+  const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress;
 
+  if (!ip || ip === '::1' || ip.startsWith('127.')) {
+    return res.json({ ip, note: 'Localhost or internal IP detected' });
+  }
+
+  try {
     const geo = await fetch(`http://ip-api.com/json/${ip}`).then(r => r.json());
 
     await pool.query(
